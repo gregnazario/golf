@@ -1,0 +1,25 @@
+# Rust
+rust/target/
+
+# Go
+go/cmd/generate_fixtures/generate_fixtures
+
+# Python
+python/.venv/
+python/__pycache__/
+python/golf/__pycache__/
+python/tests/__pycache__/
+python/*.egg-info/
+python/.pytest_cache/
+
+# TypeScript
+typescript/node_modules/
+typescript/dist/
+
+# Test fixtures (regenerated)
+testdata/*.golf
+
+# Editor
+.DS_Store
+*.swp
+*.swo

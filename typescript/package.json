@@ -1,0 +1,20 @@
+{
+  "name": "golf-format",
+  "version": "0.1.0",
+  "description": "Read-only indexed storage file format for time-series range queries",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "tsx --test src/*.test.ts"
+  },
+  "dependencies": {
+    "lz4js": "^0.2.0",
+    "crc-32": "^1.2.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "tsx": "^4.7.0",
+    "@types/node": "^20.10.0"
+  }
+}
