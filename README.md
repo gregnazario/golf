@@ -1,5 +1,7 @@
 # Golf
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A read-only indexed binary file format optimized for range queries over
 time-series keys with small fixed-size record values.
 
@@ -115,6 +117,36 @@ const reader = GolfReader.open('data.golf');
 const records = reader.query(1000n, 2000n);
 ```
 
+## Installation
+
+Golf packages are **not yet published** -- there is nothing on crates.io, PyPI,
+npm, or any Go module registry. For now, install from source and verify each
+implementation by running its test suite:
+
+```bash
+git clone https://github.com/gregnazario/golf.git
+cd golf
+
+# Rust
+cd rust && cargo test
+
+# Go
+cd ../go && go test ./...
+
+# Python
+cd ../python
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]" && pytest
+
+# TypeScript
+cd ../typescript && npm install && npm run build && npm test
+```
+
+A passing test suite means the implementation is built and usable locally from
+its directory (e.g., import `golf` from the activated Python virtualenv, or
+import from `typescript/dist/` after building). See [Running Tests](#running-tests)
+for details, including the full cross-language compatibility suite.
+
 ## Running Tests
 
 ```bash
@@ -149,4 +181,4 @@ golf/
 
 ## License
 
-MIT
+MIT -- see [LICENSE](LICENSE).
