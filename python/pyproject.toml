@@ -7,6 +7,10 @@ name = "golf-format"
 version = "0.1.0"
 description = "Read-only indexed storage file format for time-series range queries"
 requires-python = ">=3.9"
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+]
+license = {text = "MIT"}
 dependencies = [
     "lz4>=4.3.0",
     "zstandard>=0.22.0",
