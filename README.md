@@ -16,7 +16,27 @@ which they are immutable and efficient for random range reads.
 - **Fixed-size records** for O(1) random access within decompressed blocks
 - **CRC32C checksums** at header, block, and index levels
 - **Configurable timestamp resolution** (nanoseconds, microseconds, milliseconds)
-- **Multi-language**: Rust, Go, Python, TypeScript
+- **Multi-language**: Rust, Go, Python, TypeScript, Swift, Kotlin
+
+## Language Support
+
+| Language   | Package / Module      | Write | Read (LZ4) | Zstd | In-memory Reader | mmap Reader |
+|------------|-----------------------|:-----:|:----------:|:----:|:----------------:|:-----------:|
+| Rust       | `golf` crate          | ✅    | ✅         | ✅   | ✅               | ✅          |
+| Go         | `golf-format/golf-go` | ✅    | ✅         | ✅   | ✅ (`bytes.Reader`) | ✅       |
+| Python     | `golf-format`         | ✅    | ✅         | ✅   | ✅               | ✅          |
+| TypeScript | `golf-format` (npm)   | ✅    | ✅         | ❌¹  | ✅               | n/a²        |
+| Swift      | `Golf` package        | ✅    | ✅         | ❌¹  | ✅               | planned     |
+| Kotlin/JVM | `golf` package        | ✅    | ✅         | ❌¹  | ✅               | planned     |
+
+1. These implementations raise a clear error when encountering Zstd instead of
+   bundling a decoder; see [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
+2. The TypeScript reader is buffer-based, which plays the same role as mmap on
+   the JS runtime.
+
+All six implementations are byte-compatible with each other and validated
+against shared fixtures on every test run -- a file written by any language can
+be read by every language that supports its codec.
 
 ## File Format
 
@@ -63,6 +83,8 @@ let mut reader = GolfReader::open_path("data.golf").unwrap();
 let records = reader.query(1000, 2000).unwrap();
 ```
 
+More: [rust/README.md](rust/README.md)
+
 ### Go
 
 ```go
@@ -84,6 +106,8 @@ reader, _ := golf.OpenFile("data.golf")
 records, _ := reader.Query(1000, 2000)
 ```
 
+More: [go/README.md](go/README.md)
+
 ### Python
 
 ```python
@@ -101,7 +125,10 @@ with GolfReader.open('data.golf') as reader:
     records = reader.query(1000, 2000)
 ```
 
-### TypeScript
+Install from this repo: `pip install ./python`.
+More: [python/README.md](python/README.md)
+
+### TypeScript (Node.js)
 
 ```typescript
 import { GolfWriter, GolfReader, Compression } from 'golf-format';
@@ -116,6 +143,46 @@ fs.writeFileSync('data.golf', writer.seal());
 const reader = GolfReader.open('data.golf');
 const records = reader.query(1000n, 2000n);
 ```
+
+Timestamps are JavaScript `BigInt`. More: [typescript/README.md](typescript/README.md)
+
+### Swift
+
+```swift
+import Golf
+
+// Write
+let writer = GolfWriter(config: WriterConfig(recordValueSize: 8, compression: .lz4))
+try writer.append(timestamp: 1000, value: [UInt8](repeating: 1, count: 8))
+try writer.append(timestamp: 2000, value: [UInt8](repeating: 2, count: 8))
+try writer.seal(to: URL(fileURLWithPath: "data.golf"))
+
+// Read
+let reader = try GolfReader.open("data.golf")
+let records = try reader.query(start: 1000, end: 2000)
+```
+
+Zero third-party dependencies (software CRC32C + built-in LZ4 block codec).
+More: [swift/README.md](swift/README.md)
+
+### Kotlin
+
+```kotlin
+import golf.*
+
+// Write
+val writer = GolfWriter(WriterConfig(recordValueSize = 8, compression = Compression.LZ4))
+writer.append(1000UL, ByteArray(8) { 1 })
+writer.append(2000UL, ByteArray(8) { 2 })
+writer.sealTo(File("data.golf"))
+
+// Read
+val reader = GolfReader.open("data.golf")
+val records = reader.query(1000UL, 2000UL)
+```
+
+Timestamps are `ULong`; zero third-party dependencies (JDK CRC32C + built-in
+LZ4 block codec). More: [kotlin/README.md](kotlin/README.md)
 
 ## Installation
 
@@ -140,12 +207,20 @@ pip install -e ".[dev]" && pytest
 
 # TypeScript
 cd ../typescript && npm install && npm run build && npm test
+
+# Swift
+cd ../swift && swift test
+
+# Kotlin (uses kotlinc directly -- no Gradle/network needed)
+bash scripts/test.sh
 ```
 
 A passing test suite means the implementation is built and usable locally from
 its directory (e.g., import `golf` from the activated Python virtualenv, or
-import from `typescript/dist/` after building). See [Running Tests](#running-tests)
-for details, including the full cross-language compatibility suite.
+import from `typescript/dist/` after building). Each language directory has its
+own README with package-level install instructions. See
+[Running Tests](#running-tests) for details, including the full cross-language
+compatibility suite.
 
 ## Running Tests
 
@@ -163,9 +238,28 @@ pip install -e ".[dev]" && pytest
 # TypeScript
 cd typescript && npm install && npm test
 
-# Full cross-language compatibility suite
+# Swift
+cd swift && swift test
+
+# Kotlin (uses kotlinc directly -- no Gradle/network needed)
+bash kotlin/scripts/test.sh
+
+# Full cross-language compatibility suite (writes fixtures from every
+# implementation, then verifies every implementation reads them all)
 bash testdata/run_compat_tests.sh
 ```
+
+The compat suite regenerates everything under `testdata/*.golf`; see
+[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) for what each fixture exercises.
+
+## Documentation Index
+
+| Document                                  | Contents                                            |
+|-------------------------------------------|-----------------------------------------------------|
+| [SPEC.md](SPEC.md)                        | Canonical byte-level file format specification      |
+| [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) | Cross-language parity guarantees + fixture suite |
+| [CONTRIBUTING.md](CONTRIBUTING.md)        | How to change the format/implementations safely     |
+| `rust/README.md`, `go/README.md`, ...     | Per-language install, API reference, examples       |
 
 ## Project Structure
 
@@ -175,8 +269,11 @@ golf/
   rust/                -- Rust implementation (reference)
   go/                  -- Go implementation
   python/              -- Python implementation
-  typescript/          -- TypeScript implementation
-  testdata/            -- Cross-language test fixtures
+  typescript/          -- TypeScript/Node.js implementation
+  swift/               -- Swift package (zero dependencies)
+  kotlin/              -- Kotlin/JVM library (zero dependencies)
+  testdata/            -- Cross-language test fixtures + compat runner
+  docs/                -- Design & compatibility documentation
 ```
 
 ## License

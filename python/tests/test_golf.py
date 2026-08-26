@@ -300,3 +300,21 @@ class TestCrossLanguageFixtures:
         with GolfReader.open(p) as reader:
             assert reader.metadata[0].key == "source"
             assert reader.metadata[0].value == "typescript-generator"
+
+    @pytest.mark.parametrize("lang", ["swift", "kotlin"])
+    def test_read_rle_decoder_oracle(self, has_fixtures, lang):
+        # <lang>_rle.golf files are written by the Swift/Kotlin encoders over
+        # worst-case (all-zero) LZ4 input whose blocks would end inside a
+        # match without the final-5-literals rule. python-lz4 is bound to
+        # reference liblz4, so decoding them here is an independent oracle
+        # for those encoders' conformance.
+        p = TESTDATA_DIR / f"{lang}_rle.golf"
+        if not p.exists():
+            pytest.skip(f"{lang}_rle.golf not found")
+        with GolfReader.open(p) as reader:
+            assert reader.header.compression == Compression.LZ4
+            assert reader.record_count == 300
+            result = reader.query(0, 299 * 250)
+            assert len(result) == 300
+            assert [r.timestamp for r in result] == [i * 250 for i in range(300)]
+            assert all(r.value == b"\x00" * 16 for r in result)
