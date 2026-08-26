@@ -3,7 +3,7 @@ name = "golf"
 version = "0.1.0"
 edition = "2021"
 description = "Read-only indexed storage file format for time-series range queries"
-license = "MIT"
+license = "Apache-2.0"
 
 [dependencies]
 crc32c = "0.6"
