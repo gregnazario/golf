@@ -78,5 +78,25 @@ fun main(args: Array<String>) {
         println("  kotlin_metadata.golf: 10 records, with metadata")
     }
 
+    // kotlin_rle.golf: 300 records of all-zero values -- worst-case LZ4 input
+    // whose blocks would end inside a match without the final-5-literals
+    // rule. Read back by the Python suite (liblz4) as an independent decoder
+    // oracle for this encoder.
+    run {
+        val w = GolfWriter(
+            WriterConfig(
+                recordValueSize = 16,
+                tsResolution = TimestampResolution.MICROSECONDS,
+                compression = Compression.LZ4,
+                blockCapacity = 8,
+            ),
+        )
+        for (i in 0 until 300) {
+            w.append((i * 250L).toULong(), ByteArray(16))
+        }
+        w.sealTo(File(outputDir, "kotlin_rle.golf"))
+        println("  kotlin_rle.golf: 300 records, LZ4 all-zero (decoder oracle)")
+    }
+
     println("Generated Kotlin fixtures in ${outputDir.absolutePath}")
 }

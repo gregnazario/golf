@@ -101,17 +101,40 @@ data class GolfHeader(
                 throw GolfException("header CRC mismatch: expected ${computedCrc.toString(16)}, got ${storedCrc.toString(16)}")
             }
 
+            // Unknown enum bytes must fail loudly rather than silently remap:
+            // an unrecognized codec misreported as NONE would only surface as
+            // a confusing block-CRC error later. Field values are range-checked
+            // in the unsigned domain so crafted u32s can't truncate to
+            // negative/zero Ints downstream.
+            val resolution = TimestampResolution.fromCode(buf[12].toUByte())
+                ?: throw GolfException("unsupported timestamp resolution: ${buf[12]}")
+            val compression = Compression.fromCode(buf[13].toUByte())
+                ?: throw GolfException("unsupported compression codec: ${buf[13]}")
+
+            val recordValueSize = Le.u32(buf, 8)
+            val blockCapacity = Le.u32(buf, 14)
+            val metadataLength = Le.u32(buf, 52)
+            if (recordValueSize !in 1..Int.MAX_VALUE.toLong()) {
+                throw GolfException("invalid recordValueSize: $recordValueSize")
+            }
+            if (blockCapacity !in 1..Int.MAX_VALUE.toLong()) {
+                throw GolfException("invalid blockCapacity: $blockCapacity")
+            }
+            if (metadataLength > Int.MAX_VALUE.toLong()) {
+                throw GolfException("invalid metadataLength: $metadataLength")
+            }
+
             return GolfHeader(
                 version = version,
                 flags = Le.u16(buf, 6),
-                recordValueSize = Le.u32(buf, 8).toInt(),
-                tsResolution = TimestampResolution.fromCode(buf[12].toUByte()),
-                compression = Compression.fromCode(buf[13].toUByte()) ?: Compression.NONE,
-                blockCapacity = Le.u32(buf, 14).toInt(),
+                recordValueSize = recordValueSize.toInt(),
+                tsResolution = resolution,
+                compression = compression,
+                blockCapacity = blockCapacity.toInt(),
                 minTimestamp = Le.u64(buf, 28),
                 maxTimestamp = Le.u64(buf, 36),
                 recordCount = Le.u64(buf, 44),
-                metadataLength = Le.u32(buf, 52).toInt(),
+                metadataLength = metadataLength.toInt(),
             )
         }
 

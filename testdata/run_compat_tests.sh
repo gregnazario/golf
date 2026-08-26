@@ -102,7 +102,10 @@ run_step "TypeScript" bash -c "cd '$ROOT_DIR/typescript' && npx tsx --test src/g
 echo ""
 
 if command -v swift >/dev/null 2>&1; then
-    run_step "Swift" bash -c "cd '$ROOT_DIR/swift' && swift test 2>&1 | grep -Ev '^\[[0-9]+/[0-9]+\]|Building|Build complete'"
+    # pipefail is set INSIDE bash -c because shell options do not propagate to
+    # child shells; without it grep's exit status would mask swift test
+    # failures and the step could never fail.
+    run_step "Swift" bash -c "set -o pipefail; cd '$ROOT_DIR/swift' && swift test 2>&1 | grep -Ev '^\[[0-9]+/[0-9]+\]|Building|Build complete'"
     echo ""
 else
     echo -e "${BOLD}[Swift]${NC} skipped (swift not found)"

@@ -32,8 +32,8 @@ enum class TimestampResolution(val code: UByte) {
     MILLISECONDS(2u);
 
     companion object {
-        fun fromCode(code: UByte): TimestampResolution =
-            entries.firstOrNull { it.code == code } ?: NANOSECONDS
+        fun fromCode(code: UByte): TimestampResolution? =
+            entries.firstOrNull { it.code == code }
     }
 }
 

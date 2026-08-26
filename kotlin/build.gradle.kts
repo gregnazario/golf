@@ -13,21 +13,23 @@ kotlin {
     jvmToolchain(17)
 }
 
+// A target that lives in the main source set, so `gradle run` works out of the
+// box: it regenerates this language's cross-language fixtures into ../testdata.
 application {
-    // Default entrypoint: the test suite (fixtures have their own class).
-    mainClass.set("golf.TestMainKt")
+    mainClass.set("golf.GenerateFixturesKt")
 }
 
-tasks.register<JavaExec>("generateFixtures") {
-    group = "golf"
-    description = "Regenerate Kotlin cross-language fixtures into ../testdata."
-    mainClass.set("golf.GenerateFixturesKt")
-    classpath = sourceSets["main"].runtimeClasspath
+val generateFixtures by tasks.existing(JavaExec::class) {
     args = (project.findProperty("out") as? String)?.let { listOf(it) } ?: listOf("../testdata")
 }
 
-// The bundled TestMain suite exits non-zero on failure and prints per-suite
-// results, so it runs fine as a "test" without JUnit on the classpath.
-tasks.test {
-    dependsOn(tasks.named("run"))
+// The self-contained test suite's entrypoint lives in src/test/kotlin, so it
+// must run on the *test* source-set classpath; a plain `JavaExec` over the
+// main classpath would throw ClassNotFoundException.
+tasks.register<JavaExec>("runTestSuite") {
+    group = "verification"
+    description = "Run the self-contained golf test suite (no JUnit required)."
+    mainClass.set("golf.TestMainKt")
+    classpath = sourceSets["test"].runtimeClasspath
+    args = listOf("../testdata")
 }

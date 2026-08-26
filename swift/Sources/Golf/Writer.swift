@@ -62,20 +62,21 @@ public final class GolfWriter {
         records.append(Record(timestamp: timestamp, value: value))
     }
 
-    /// Convenience that builds the value from little-endian integer(s).
+    /// Convenience that builds the value from a little-endian integer.
     ///
-    /// Only the low `recordValueSize * 8` bits are stored, zero-padded on the left.
+    /// The integer is serialized with shift-based byte extraction (endian-
+    /// independent on any host), then zero-padded in the high-order bytes to
+    /// `recordValueSize` (or truncated to its low 8 bytes when smaller).
     public func append(timestamp: UInt64, intValue: UInt64) throws {
         let size = max(config.recordValueSize, 0)
-        var raw = intValue.littleEndian.bytes()
+        let raw = intValue.bytes()
         if size > 8 {
             var padded = [UInt8](repeating: 0, count: size)
             padded.replaceSubrange(0..<8, with: raw)
-            raw = padded
+            try append(timestamp: timestamp, value: padded)
         } else {
-            raw = Array(raw[0..<min(8, size)])
+            try append(timestamp: timestamp, value: Array(raw[0..<min(8, size)]))
         }
-        try append(timestamp: timestamp, value: raw)
     }
 
     /// Seals the accumulated records and returns the complete `.golf` file image.

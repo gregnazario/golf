@@ -51,17 +51,31 @@ class GolfReader private constructor(
             }
 
             // Footer → block index → header; each step is checksum-validated.
+            // Offset arithmetic runs in the unsigned domain with bounds
+            // checked *before* any narrowing, so crafted u64s surface as
+            // typed errors instead of truncation or OutOfMemoryError.
             val footer = Footer.decode(data.copyOfRange(data.size - FOOTER_SIZE, data.size))
+            if (footer.indexOffset > data.size.toULong() ||
+                footer.blockCount > (data.size / BLOCK_DESCRIPTOR_SIZE).toULong()
+            ) {
+                throw GolfException(
+                    "corrupted index: offset ${footer.indexOffset}, ${footer.blockCount} blocks outside file",
+                )
+            }
             val indexStart = footer.indexOffset.toInt()
-            val indexEnd = indexStart + footer.blockCount.toInt() * BLOCK_DESCRIPTOR_SIZE
-            if (indexStart < 0 || indexEnd > data.size - FOOTER_SIZE || indexStart > indexEnd) {
-                throw GolfException("corrupted index: range $indexStart..$indexEnd outside file")
+            val indexEnd = indexStart + footer.blockCount.toInt() * BLOCK_DESCRIPTOR_SIZE // bounded ⇒ no overflow
+            if (indexEnd > data.size - FOOTER_SIZE) {
+                throw GolfException(
+                    "corrupted index: range $indexStart..$indexEnd outside file",
+                )
             }
             val indexBytes = data.copyOfRange(indexStart, indexEnd)
             if (Crc32c.checksum(indexBytes) != footer.indexCrc) {
                 throw GolfException("block index CRC mismatch")
             }
-            val descriptors = ArrayList<BlockDescriptor>(footer.blockCount.toInt())
+            // Capacity hint is clamped: a hostile blockCount can't make the
+            // ArrayList preallocation itself fail.
+            val descriptors = ArrayList<BlockDescriptor>(minOf(footer.blockCount.toInt(), 4096))
             repeat(footer.blockCount.toInt()) { i ->
                 descriptors.add(BlockDescriptor.decode(indexBytes, i * BLOCK_DESCRIPTOR_SIZE))
             }
@@ -118,9 +132,15 @@ class GolfReader private constructor(
 
     /** Loads the block described by [desc] and verifies its CRC32C. */
     private fun decompressedBlock(desc: BlockDescriptor): ByteArray {
+        // Narrow only after unsigned-domain bounds checks.
+        if (desc.blockOffset > data.size.toULong() ||
+            desc.compressedSize.toLong() !in 0..data.size.toLong()
+        ) {
+            throw GolfException("corrupted block: offset ${desc.blockOffset}, size ${desc.compressedSize} outside file")
+        }
         val start = desc.blockOffset.toInt()
         val end = start + desc.compressedSize
-        if (start < 0 || end < start || end > data.size) {
+        if (end < start || end > data.size) {
             throw GolfException("corrupted block: range $start..$end outside file")
         }
         val payload = data.copyOfRange(start, end)

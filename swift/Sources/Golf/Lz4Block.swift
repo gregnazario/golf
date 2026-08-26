@@ -9,11 +9,13 @@
 /// Minimal-but-conformant implementation of the LZ4 block format.
 ///
 /// The decoder parses arbitrary conformant blocks. The encoder uses a greedy
-/// single-slot hash-chain matcher and obeys the format's safety rules: minimum
-/// match length 4, offsets 1...65535, and no match starting within the last
-/// `mflimit` (12) bytes of the input, which guarantees every standard decoder
-/// accepts the output. Its ratio trails the reference `liblz4`, but the output
-/// is bit-compatible with anything that speaks the block format.
+/// single-slot hash-chain matcher and obeys the format's safety rules the same
+/// way the reference encoder does: minimum match length 4, offsets 1...65535,
+/// no match starting within the last `mflimit` (12) bytes of the input, and
+/// match extension capped so the final `lastLiterals` (5) bytes are always
+/// emitted as a literal run — strict decoders such as liblz4 reject blocks
+/// that end inside a match. Its ratio trails the reference `liblz4`, but the
+/// output is bit-compatible with anything that speaks the block format.
 enum Lz4Block {
     private static let minMatch = 4
     private static let mflimit = 12       // matches may not start in the last 12 bytes
@@ -62,9 +64,13 @@ enum Lz4Block {
                    src[cand + 1] == src[i + 1],
                    src[cand + 2] == src[i + 2],
                    src[cand + 3] == src[i + 3] {
-                    // Match confirmed; extend up to the end of input.
+                    // Match confirmed; extend like the reference encoder, whose
+                    // match limit excludes the final `lastLiterals` bytes so the
+                    // block always ends with a >=5-byte literal run (strict
+                    // decoders such as liblz4 reject anything shorter).
                     var matchLen = minMatch
-                    while i + matchLen < n, src[cand + matchLen] == src[i + matchLen] {
+                    while i + matchLen < n - lastLiterals,
+                          src[cand + matchLen] == src[i + matchLen] {
                         matchLen += 1
                     }
 

@@ -130,6 +130,21 @@ private object Lz4BlockTests {
             passed++
         }
 
+        suite("LZ4 block always ends with literals") {
+            // Regression: without the lastLiterals cap these constant-payload
+            // blocks ended inside a match (empty final literal run) and
+            // strict decoders such as liblz4 rejected the stream outright.
+            for (runLength in listOf(5, 6, 12, 20, 100, 192)) {
+                val constants = ByteArray(runLength) { 0xAA.toByte() }
+                val compressed = Lz4Block.compress(constants)
+                checkEquals(constants.toList(), Lz4Block.decompress(compressed, 0, compressed.size, runLength).toList())
+                if (runLength >= 20) {
+                    check(compressed.size < runLength, "constant run should compress (len=$runLength)")
+                }
+            }
+            passed++
+        }
+
         suite("LZ4 repetitive text compresses well") {
             val sentence = "the quick brown fox ".toByteArray()
             val text = ByteArray(sentence.size * 600)

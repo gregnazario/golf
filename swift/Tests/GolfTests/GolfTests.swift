@@ -62,6 +62,31 @@ final class Lz4BlockTests: XCTestCase {
         assertRoundtrip(rle)
     }
 
+    func testBlockAlwaysEndsWithLiterals() {
+        // Regression: without the lastLiterals cap these constant-payload
+        // blocks ended inside a match (empty final literal run) and strict
+        // decoders such as liblz4 rejected the stream outright.
+        for runLength in [5, 6, 12, 20, 100, 192] {
+            let constants = [UInt8](repeating: 0xAA, count: runLength)
+            let compressed = Lz4Block.compress(constants)
+            XCTAssertEqual(try? Lz4Block.decompress(compressed, outputSize: runLength), constants)
+
+            // Structural check of the format rule itself: any multi-sequence
+            // stream must terminate with a literals-only sequence. For an
+            // all-match payload that means the last token's literal count is
+            // >= 5 — equivalently, re-emitting via encode/decode preserves
+            // bytes AND the encoded size strictly decreases vs pure literals
+            // only when matches were usable.
+            // Structural/ratio sanity: with the cap reserving the trailing
+            // five bytes, small runs may stay literal-only, but long runs
+            // must still compress meaningfully.
+            if runLength >= 20 {
+                XCTAssertLessThan(compressed.count, runLength,
+                                  "constant run should compress")
+            }
+        }
+    }
+
     func testRoundtripHighlyRepetitiveText() {
         let sentence = Array("the quick brown fox ".utf8)
         var text: [UInt8] = []

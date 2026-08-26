@@ -36,13 +36,24 @@ public struct GolfReader {
         }
 
         // Footer → block index → header; each step is checksum-validated.
+        // Offset arithmetic runs in the unsigned domain with bounds checked
+        // *before* any narrowing to Int, so crafted u64 values surface as
+        // typed errors instead of trap-on-cast crashes or wrapped math.
         let footer = try Footer.decode(Array(data[(data.count - Golf.footerSize)...]))
-        let indexStart = Int(footer.indexOffset)
-        let indexEnd = indexStart + Int(footer.blockCount) * Golf.blockDescriptorSize
-        guard indexStart >= 0, indexEnd <= data.count - Golf.footerSize else {
-            throw GolfError.corruptedIndex("index range \(indexStart)..\(indexEnd) outside file")
+        let descriptorCount = UInt64(Golf.blockDescriptorSize)
+        guard footer.indexOffset <= UInt64(data.count),
+              footer.blockCount <= UInt64(data.count) / descriptorCount
+        else {
+            throw GolfError.corruptedIndex(
+                "index range \(footer.indexOffset)+\(footer.blockCount) blocks outside file")
         }
-        let indexBytes = Array(data[indexStart..<indexEnd])
+        let indexSize = descriptorCount * footer.blockCount   // bounded above ⇒ no overflow
+        let indexEnd = footer.indexOffset + indexSize         // likewise
+        guard indexEnd <= UInt64(data.count - Golf.footerSize) else {
+            throw GolfError.corruptedIndex(
+                "index range \(footer.indexOffset)..+\(indexSize) outside file")
+        }
+        let indexBytes = Array(data[Int(footer.indexOffset)..<Int(indexEnd)])
         guard CRC32C.checksum(indexBytes) == footer.indexCrc else {
             throw GolfError.crcMismatch("block index")
         }
@@ -116,9 +127,16 @@ public struct GolfReader {
 
     /// Loads the block described by `desc` and verifies its CRC32C.
     private func decompressedBlock(_ desc: BlockDescriptor) throws -> [UInt8] {
+        // Validate in the unsigned domain before narrowing to Int.
+        guard desc.blockOffset <= UInt64(data.count),
+              UInt64(desc.compressedSize) <= UInt64(data.count)
+        else {
+            throw GolfError.corruptedIndex(
+                "block at \(desc.blockOffset)..+\(desc.compressedSize) outside file")
+        }
         let start = Int(desc.blockOffset)
         let end = start + desc.compressedSize
-        guard start >= 0, end <= data.count, start <= end else {
+        guard end <= data.count, start <= end else {
             throw GolfError.corruptedIndex("block at \(start)..\(end) outside file")
         }
         let payload = Array(data[start..<end])

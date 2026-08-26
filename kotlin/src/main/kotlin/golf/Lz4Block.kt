@@ -13,15 +13,18 @@ package golf
  * sequences for identical input.
  *
  * The decoder parses arbitrary conformant blocks. The encoder uses a greedy
- * single-slot hash matcher and obeys the format's safety rules: minimum match
- * length 4, offsets 1..65535, and no match starting within the last `mflimit`
- * (12) bytes of input — which guarantees every standard decoder accepts the
- * output. Its ratio trails reference `liblz4`, but output is compatible with
- * anything that speaks the block format.
+ * single-slot hash matcher and obeys the format's safety rules the same way
+ * the reference encoder does: minimum match length 4, offsets 1..65535, no
+ * match starting within the last `mflimit` (12) bytes of input, and match
+ * extension capped so the final `lastLiterals` (5) bytes are always emitted
+ * as a literal run — strict decoders such as liblz4 reject blocks that end
+ * inside a match. Its ratio trails reference `liblz4`, but output is
+ * compatible with anything that speaks the block format.
  */
 object Lz4Block {
     private const val MIN_MATCH = 4
     private const val MFLIMIT = 12      // matches may not start in the last 12 bytes
+    private const val LAST_LITERALS = 5 // final literal run guaranteed >= this
     private const val HASH_LOG = 14
 
     /** Worst-case compressed size for [size] input bytes. */
@@ -56,9 +59,13 @@ object Lz4Block {
                     src[cand + 2] == src[i + 2] &&
                     src[cand + 3] == src[i + 3]
                 ) {
-                    // Match confirmed; extend up to the end of input.
+                    // Match confirmed; extend like the reference encoder,
+                    // whose match limit excludes the final LAST_LITERALS
+                    // bytes so the block always ends with a >=5-byte literal
+                    // run (strict decoders reject anything shorter).
                     var matchLen = MIN_MATCH
-                    while (i + matchLen < n && src[cand + matchLen] == src[i + matchLen]) {
+                    while (i + matchLen < n - LAST_LITERALS &&
+                           src[cand + matchLen] == src[i + matchLen]) {
                         matchLen++
                     }
 

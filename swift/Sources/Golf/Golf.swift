@@ -78,4 +78,10 @@ public enum GolfError: Error, Equatable, Sendable {
 
     /// Block index range was invalid against file size.
     case corruptedIndex(String)
+
+    /// Header declares a timestamp-resolution byte this version doesn't know.
+    case unsupportedTimestampResolution(UInt8)
+
+    /// Header declares a compression-codec byte this version doesn't know.
+    case unsupportedCompressionCodec(UInt8)
 }

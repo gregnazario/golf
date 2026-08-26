@@ -125,12 +125,22 @@ extension GolfHeader {
         let computedCRC = CRC32C.checksum(buf[0..<56])
         guard storedCRC == computedCRC else { throw GolfError.crcMismatch("header") }
 
+        // Unknown enum bytes must fail loudly rather than silently remap:
+        // an unrecognized codec misreported as "none" would only surface as
+        // a confusing block-CRC error later.
+        guard let resolution = TimestampResolution(rawValue: buf[12]) else {
+            throw GolfError.unsupportedTimestampResolution(buf[12])
+        }
+        guard let compression = Compression(rawValue: buf[13]) else {
+            throw GolfError.unsupportedCompressionCodec(buf[13])
+        }
+
         return GolfHeader(
             version: version,
             flags: LE.readU16(buf, 6),
             recordValueSize: Int(LE.readU32(buf, 8)),
-            tsResolution: TimestampResolution(rawValue: buf[12]) ?? .nanoseconds,
-            compression: Compression(rawValue: buf[13]) ?? Compression.none,
+            tsResolution: resolution,
+            compression: compression,
             blockCapacity: Int(LE.readU32(buf, 14)),
             minTimestamp: LE.readU64(buf, 28),
             maxTimestamp: LE.readU64(buf, 36),

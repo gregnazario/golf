@@ -71,6 +71,22 @@ do {
     }
     try w.seal(to: outputDir.appendingPathComponent("swift_metadata.golf"))
     print("  swift_metadata.golf: 10 records, with metadata")
+
+    // swift_rle.golf: 300 records of all-zero values -- worst-case LZ4 input
+    // whose blocks would end inside a match without the final-5-literals
+    // rule. Read back by the Python suite (liblz4) as an independent decoder
+    // oracle for this encoder.
+    w = GolfWriter(config: WriterConfig(
+        recordValueSize: 16,
+        tsResolution: .microseconds,
+        compression: .lz4,
+        blockCapacity: 8
+    ))
+    for i in 0..<300 {
+        try w.append(timestamp: UInt64(i) * 250, value: [UInt8](repeating: 0, count: 16))
+    }
+    try w.seal(to: outputDir.appendingPathComponent("swift_rle.golf"))
+    print("  swift_rle.golf: 300 records, LZ4 all-zero (decoder oracle)")
 } catch {
     FileHandle.standardError.write(Data("fixture generation failed: \(error)\n".utf8))
     exit(1)
