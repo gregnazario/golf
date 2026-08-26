@@ -2,10 +2,12 @@
 # Cross-language compatibility test suite for the Golf file format.
 #
 # This script:
-# 1. Generates .golf fixtures from Rust, Go, Python, and TypeScript
+# 1. Generates .golf fixtures from Rust, Go, Python, TypeScript, Swift, and Kotlin
 # 2. Runs each language's test suite to validate it can read all fixtures
 #
-# Prerequisites: Rust, Go, Python 3 (with venv), Node.js/npm installed.
+# Prerequisites: Rust, Go, Python 3 (with venv), Node.js/npm. The Swift and
+# Kotlin suites are included automatically when `swift` / `kotlinc` are on PATH
+# and skipped (with a notice) otherwise.
 
 set -euo pipefail
 
@@ -27,10 +29,11 @@ run_step() {
     echo -e "${BOLD}[$label]${NC} $*"
     if "$@"; then
         echo -e "${GREEN}  PASS${NC}"
-        ((pass++))
+        # Not `((pass++))`: with `set -e`, evaluating to 0 would abort the script.
+        pass=$((pass + 1))
     else
         echo -e "${RED}  FAIL${NC}"
-        ((fail++))
+        fail=$((fail + 1))
     fi
 }
 
@@ -60,6 +63,22 @@ echo "--- TypeScript ---"
 (cd "$ROOT_DIR/typescript" && npx tsx src/generate_fixtures.ts "$TESTDATA_DIR" 2>&1)
 echo ""
 
+if command -v swift >/dev/null 2>&1; then
+    echo "--- Swift ---"
+    (cd "$ROOT_DIR/swift" && swift run -c release GolfFixtures "$TESTDATA_DIR" 2>&1)
+    echo ""
+else
+    echo -e "${BOLD}--- Swift ---${NC} skipped (swift not found)"
+fi
+
+if command -v kotlinc >/dev/null 2>&1; then
+    echo "--- Kotlin ---"
+    bash "$ROOT_DIR/kotlin/scripts/generate-fixtures.sh" 2>&1
+    echo ""
+else
+    echo -e "${BOLD}--- Kotlin ---${NC} skipped (kotlinc not found)"
+fi
+
 echo ""
 echo "Generated fixtures:"
 ls -la "$TESTDATA_DIR"/*.golf
@@ -81,6 +100,20 @@ echo ""
 
 run_step "TypeScript" bash -c "cd '$ROOT_DIR/typescript' && npx tsx --test src/golf.test.ts 2>&1"
 echo ""
+
+if command -v swift >/dev/null 2>&1; then
+    run_step "Swift" bash -c "cd '$ROOT_DIR/swift' && swift test 2>&1 | grep -Ev '^\[[0-9]+/[0-9]+\]|Building|Build complete'"
+    echo ""
+else
+    echo -e "${BOLD}[Swift]${NC} skipped (swift not found)"
+fi
+
+if command -v kotlinc >/dev/null 2>&1; then
+    run_step "Kotlin" bash -c "bash '$ROOT_DIR/kotlin/scripts/test.sh' 2>&1"
+    echo ""
+else
+    echo -e "${BOLD}[Kotlin]${NC} skipped (kotlinc not found)"
+fi
 
 # ── Summary ──
 

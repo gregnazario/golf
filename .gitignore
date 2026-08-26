@@ -16,6 +16,12 @@ python/.pytest_cache/
 typescript/node_modules/
 typescript/dist/
 
+# Swift
+swift/.build/
+
+# Kotlin
+kotlin/.build/
+
 # Test fixtures (regenerated)
 testdata/*.golf
 
