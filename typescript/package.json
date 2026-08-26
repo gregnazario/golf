@@ -2,7 +2,7 @@
   "name": "golf-format",
   "version": "0.1.0",
   "description": "Read-only indexed storage file format for time-series range queries",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
