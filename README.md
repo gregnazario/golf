@@ -20,6 +20,10 @@ which they are immutable and efficient for random range reads.
 
 ## Language Support
 
+Package names below are local module names, not published packages -- nothing
+is on crates.io, npm, PyPI, or any Go module registry yet; build from source
+(see [Installation](#installation)).
+
 | Language   | Package / Module      | Write | Read (LZ4) | Zstd | In-memory Reader | mmap Reader |
 |------------|-----------------------|:-----:|:----------:|:----:|:----------------:|:-----------:|
 | Rust       | `golf` crate          | ✅    | ✅         | ✅   | ✅               | ✅          |
